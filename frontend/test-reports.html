@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>檢舉記錄測試頁面</title>
+  <!-- 引入 Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .report { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }
+    .error { color: red; padding: 10px; background: #ffe6e6; border-radius: 5px; }
+    .success { color: green; padding: 10px; background: #e6ffe6; border-radius: 5px; }
+    button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .stats { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+    .chart-container { 
+      margin-top: 20px; 
+      position: relative; 
+      height: 300px; 
+      width: 100%;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .chart-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .chart-tab {
+      padding: 8px 15px;
+      background: #e9ecef;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      color: #495057;
+    }
+    .chart-tab.active {
+      background: #007bff;
+      color: white;
+    }
+    
+    /* 標籤樣式 */
+    .tag {
+      background: linear-gradient(135deg, #28a745, #20c997);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-right: 5px;
+      display: inline-block;
+      margin-bottom: 3px;
+    }
+    
+    .no-tags {
+      color: #6c757d;
+      font-style: italic;
+    }
+    
+    .filter-section {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    
+    .filter-btn {
+      padding: 5px 10px;
+      margin: 2px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    
+    .filter-btn.active {
+      background: #007bff;
+    }
+    
+    .filter-btn:hover {
+      background: #5a6268;
+    }
+    
+    .filter-btn.active:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 檢舉記錄測試頁面</h1>
+  <p>此頁面用於測試後端 API 和顯示所有檢舉記錄</p>
+
+  <div class="stats">
+    <h3>📈 統計資訊</h3>
+    <div id="stats">載入中...</div>
+    
+    <!-- 圖表容器 -->
+    <div class="chart-container" id="chartContainer" style="display: none;">
+      <div class="chart-tabs">
+        <button class="chart-tab active" data-chart="tagChart">標籤分布圖</button>
+        <button class="chart-tab" data-chart="timeChart">時間趨勢圖</button>
+      </div>
+      <canvas id="reportChart"></canvas>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <h3>🏷️ 標籤篩選</h3>
+    <div id="filterButtons">
+      <button class="filter-btn active" data-filter="all">全部</button>
+    </div>
+  </div>
+
+  <div>
+    <button onclick="loadReports()">🔄 載入所有檢舉</button>
+    <button onclick="loadStats()">📊 載入統計資訊</button>
+    <button onclick="testAPI()">🧪 測試 API</button>
+  </div>
+
+  <div id="result"></div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000';
+    let allReports = [];
+    let currentFilter = 'all';
+
+    // 載入所有檢舉記錄
+    async function loadReports() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '<p>載入中...</p>';
+
+      try {
+        const response = await fetch(`${API_BASE}/reports`);
+        const data = await response.json();
+
+        if (data.success) {
+          allReports = data.reports || [];
+          
+          if (allReports.length === 0) {
+            resultDiv.innerHTML = '<div class="success">✅ API 正常，但尚無檢舉記錄</div>';
+            return;
+          }
+
+          // 更新篩選按鈕
+          updateFilterButtons();
+          
+          // 顯示檢舉記錄
+          displayReports();
+          
+        } else {
+          resultDiv.innerHTML = `<div class="error">❌ API 錯誤: ${data.error}</div>`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="error">❌ 連接錯誤: ${error.message}</div>`;
+      }
+    }
+
+    // 更新篩選按鈕
+    function updateFilterButtons() {
+      const filterButtonsDiv = document.getElementById('filterButtons');
+      const allTags = new Set();
+      
+      // 收集所有標籤
+      allReports.forEach(report => {
+        if (report.tags && report.tags.length > 0) {
+          report.tags.forEach(tag => allTags.add(tag));
+        }
+      });
+
+      let buttonsHtml = '<button class="filter-btn active" data-filter="all" onclick="filterReports(\'all\')">全部</button>';
+      allTags.forEach(tag => {
+        buttonsHtml += `<button class="filter-btn" data-filter="${tag}" onclick="filterReports('${tag}')">${tag}</button>`;
+      });
+
+      filterButtonsDiv.innerHTML = buttonsHtml;
+    }
+
+    // 篩選檢舉記錄
+    function filterReports(filter) {
+      currentFilter = filter;
+      
+      // 更新按鈕狀態
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+      
+      // 顯示篩選後的記錄
+      displayReports();
+    }
+
+    // 顯示檢舉記錄
+    function displayReports() {
+      const resultDiv = document.getElementById('result');
+      
+      // 篩選記錄
+      let reportsToShow = allReports;
+      if (currentFilter !== 'all') {
+        reportsToShow = allReports.filter(report => 
+          report.tags && report.tags.includes(currentFilter)
+        );
+      }
+      
+      // 按時間倒序排列
+      const sortedReports = reportsToShow.sort((a, b) => b.timestamp - a.timestamp);
+      
+      if (sortedReports.length === 0) {
+        resultDiv.innerHTML = `<div class="success">📝 ${currentFilter === 'all' ? '尚無檢舉記錄' : `無「${currentFilter}」標籤的檢舉記錄`}</div>`;
+        return;
+      }
+
+      let html = `<div class="success">✅ 顯示 ${sortedReports.length} 筆檢舉記錄${currentFilter !== 'all' ? ` (篩選: ${currentFilter})` : ''}</div>`;
+      
+      sortedReports.forEach((report, index) => {
+        const date = new Date(report.timestamp * 1000).toLocaleString('zh-TW');
+        const shortReporter = `${report.reporter.substring(0, 6)}...${report.reporter.substring(38)}`;
+        
+        // 處理標籤顯示
+        const tagsHtml = report.tags && report.tags.length > 0 
+          ? report.tags.map(tag => `<span class="tag">${tag}</span>`).join('')
+          : '<span class="no-tags">無標籤</span>';
+        
+        // 處理內容預覽
+        const contentPreview = report.content && report.content !== '內容不可用'
+          ? (report.content.length > 80 ? report.content.substring(0, 80) + '...' : report.content)
+          : '內容不可用';
+        
+        html += `
+          <div class="report">
+            <h4>檢舉 #${allReports.length - allReports.indexOf(report)}</h4>
+            <p><strong>時間:</strong> ${date}</p>
+            <p><strong>詐騙類型標籤:</strong> ${tagsHtml}</p>
+            <p><strong>檢舉人:</strong> ${shortReporter}</p>
+            <p><strong>檢舉內容預覽:</strong> <em>"${contentPreview}"</em></p>
+            <p><strong>完整地址:</strong> <code style="font-size: 0.8rem;">${report.reporter}</code></p>
+            <p><strong>內容 CID:</strong> <code style="font-size: 0.8rem;">${report.cid}</code></p>
+            <p><strong>時間戳:</strong> ${report.timestamp}</p>
+          </div>
+        `;
+      });
+
+      resultDiv.innerHTML = html;
+    }
+
+    // 全局變數存儲圖表實例
+    let currentChart = null;
+    let currentChartType = 'tagChart'; // 預設圖表類型
+    
+    // 載入統計資訊與圖表
+    async function loadStats() {
+      const statsDiv = document.getElementById('stats');
+      const chartContainer = document.getElementById('chartContainer');
+
+      try {
+        // 同時取得統計資訊和檢舉數據
+        const [statsResponse, reportsResponse] = await Promise.all([
+          fetch(`${API_BASE}/stats`),
+          fetch(`${API_BASE}/reports`)
+        ]);
+        
+        const statsData = await statsResponse.json();
+        const reportsData = await reportsResponse.json();
+        
+        if (statsData.success) {
+          const stats = statsData.stats;
+          statsDiv.innerHTML = `
+            <p><strong>總檢舉數:</strong> ${stats.total}</p>
+            <p><strong>今日檢舉:</strong> ${stats.today}</p>
+            <p><strong>最後更新:</strong> ${new Date(stats.lastUpdated).toLocaleString('zh-TW')}</p>
+          `;
+          
+          // 顯示圖表容器
+          chartContainer.style.display = 'block';
+          
+          // 如果檢舉數據也載入成功，創建圖表
+          if (reportsData.success && reportsData.reports && reportsData.reports.length > 0) {
+            allReports = reportsData.reports;
+            createChart(currentChartType);
+            
+            // 添加圖表標籤事件監聽
+            document.querySelectorAll('.chart-tab').forEach(tab => {
+              tab.addEventListener('click', () => {
+                document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentChartType = tab.dataset.chart;
+                createChart(currentChartType);
+              });
+            });
+          } else {
+            chartContainer.innerHTML = '<p>沒有足夠的數據生成圖表</p>';
+          }
+        } else {
+          statsDiv.innerHTML = `<span style="color: red;">錯誤: ${statsData.error}</span>`;
+        }
+      } catch (error) {
+        statsDiv.innerHTML = `<span style="color: red;">連接錯誤: ${error.message}</span>`;
+      }
+    }
+    
+    // 創建圖表函數
+    function createChart(chartType) {
+      const ctx = document.getElementById('reportChart');
+      
+      // 如果已經有圖表，先銷毀它
+      if (currentChart) {
+        currentChart.destroy();
+      }
+      
+      if (chartType === 'tagChart') {
+        createTagDistributionChart(ctx);
+      } else if (chartType === 'timeChart') {
+        createTimeSeriesChart(ctx);
+      }
+    }
+    
+    // 創建標籤分布圖
+    function createTagDistributionChart(ctx) {
+      // 分析標籤分布
+      const tagCounts = {};
+      
+      allReports.forEach(report => {
+        if (report.tags && report.tags.length) {
+          report.tags.forEach(tag => {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+          });
+        } else {
+          tagCounts['無標籤'] = (tagCounts['無標籤'] || 0) + 1;
+        }
+      });
+      
+      // 準備圖表數據
+      const labels = Object.keys(tagCounts);
+      const data = Object.values(tagCounts);
+      
+      // 生成隨機顏色
+      const backgroundColors = labels.map(() => 
+        `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.7)`
+      );
+      
+      // 創建圖表
+      currentChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '檢舉數量',
+            data: data,
+            backgroundColor: backgroundColors,
+            borderColor: backgroundColors.map(color => color.replace('0.7', '1')),
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: '檢舉標籤分布統計',
+              font: {
+                size: 16
+              }
+            },
+            legend: {
+              display: false
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: '檢舉數量'
+              },
+              ticks: {
+                precision: 0
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: '標籤類型'
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // 創建時間趨勢圖
+    function createTimeSeriesChart(ctx) {
+      // 獲取最近30天的日期範圍
+      const today = new Date();
+      const dateLabels = [];
+      const reportCounts = {};
+      
+      // 生成最近30天的日期標籤
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(today.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        dateLabels.push(dateStr);
+        reportCounts[dateStr] = 0;
+      }
+      
+      // 計算每日檢舉數
+      allReports.forEach(report => {
+        const date = new Date(report.timestamp * 1000);
+        const dateStr = date.toISOString().split('T')[0];
+        if (reportCounts[dateStr] !== undefined) {
+          reportCounts[dateStr]++;
+        }
+      });
+      
+      // 準備圖表數據
+      const data = dateLabels.map(date => reportCounts[date]);
+      
+      // 創建圖表
+      currentChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: dateLabels,
+          datasets: [{
+            label: '檢舉數量',
+            data: data,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: '檢舉日期統計 (近30天)',
+              font: {
+                size: 16
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: '檢舉數量'
+              },
+              ticks: {
+                precision: 0
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: '日期'
+              },
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 測試 API 可用性
+    async function testAPI() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '<p>測試 API 連接...</p>';
+
+      const tests = [
+        { name: '檢舉列表 API', url: `${API_BASE}/reports` },
+        { name: '統計資訊 API', url: `${API_BASE}/stats` }
+      ];
+
+      let html = '<h3>🧪 API 測試結果</h3>';
+
+      for (const test of tests) {
+        try {
+          const response = await fetch(test.url);
+          const data = await response.json();
+          
+          if (data.success) {
+            html += `<p>✅ ${test.name}: 正常</p>`;
+          } else {
+            html += `<p>⚠️ ${test.name}: 回應錯誤 - ${data.error}</p>`;
+          }
+        } catch (error) {
+          html += `<p>❌ ${test.name}: 連接失敗 - ${error.message}</p>`;
+        }
+      }
+
+      resultDiv.innerHTML = html;
+    }
+
+    // 頁面載入時自動載入統計資訊
+    window.onload = () => {
+      loadStats();
+    };
+  </script>
+</body>
+</html>
