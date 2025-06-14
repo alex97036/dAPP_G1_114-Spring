@@ -51,6 +51,11 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+app.get('/health', (req, res) => {
+  console.log('health'); 
+  res.send('health'); 
+})
+
 app.post('/submit', async (req, res) => {
   try {
     const { content, tags = [] } = req.body;
