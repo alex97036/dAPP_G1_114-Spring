@@ -1,8 +1,6 @@
 {
     "watch": [
-        "src",
-        "config",
-        "scripts"
+        "src"
     ],
     "ext": "js,json,ts,tsx",
     "ignore": [
