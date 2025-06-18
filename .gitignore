@@ -58,3 +58,5 @@ coverage/
 .env
 
 .w3up/
+
+**/docs/

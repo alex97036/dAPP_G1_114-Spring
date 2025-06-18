@@ -5,6 +5,7 @@ import dotenv from "dotenv"
 import fs from "fs";
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { Report } from '../types/report.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -34,26 +35,42 @@ export async function saveToDocs(id: number, info: string) {
     }
 }
 
-
-export async function uploadFile(id: number) {
+export async function uploadFile(id: number): Promise<any> {
   const client = await create()
   await client.login(EMAIL as `${string}@${string}`)
   await client.setCurrentSpace(W3SPACE_DID as `did:${string}:${string}`)
-
-  const files = await filesFromPaths([`/docs/${id}.txt`]); 
+  const filePath = path.join(docsPath, `${id}.txt`);
+  const files = await filesFromPaths([filePath]); 
 
   const cid = await client.uploadDirectory(files)
 
   console.log('📁 Uploaded CID:', cid.toString())
   console.log(`🔗 IPFS URL: https://${cid}.ipfs.w3s.link`)
+  return cid; 
 }
+
+export async function toSol() {
+    console.log('todo'); 
+}
+
 
 export async function saveToDB(cid: string) {
     try {
-        pool.query('INSERT INTO report_list (cid) VALUES ($1)', [cid])
+        await pool.query('INSERT INTO report_list (cid) VALUES ($1)', [cid])
         console.log('✅ CID saved to database:', cid)
     } catch (error) {
         console.error('❌ Error saving CID to database:', error)
+    }
+}
+
+export async function getAllCIDs() {
+    try {
+        const result = await pool.query<Report>('SELECT * FROM report_list')
+        console.log('Fetched CIDs from database:', result.rows); 
+        return result.rows.map((row: Report) => row.cid)
+    } catch (error) {
+        console.error('Error fetching CIDs from database:', error)
+        throw error
     }
 }
 

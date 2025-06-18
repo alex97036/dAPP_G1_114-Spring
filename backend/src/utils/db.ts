@@ -21,7 +21,7 @@ export async function initDB() {
     await pool.query("SELECT NOW()");
     await pool.query(`
       CREATE TABLE IF NOT EXISTS report_list (
-        cid BIGINT PRIMARY KEY
+        cid TEXT PRIMARY KEY
       );
     `);
     console.log('✅ Table "report_list" is ready');

@@ -56,8 +56,7 @@ async function main() {
 
   const app = express();
   app.use(cors());
-  app.use(bodyParser.json());
-  app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(express.json())
   app.use(morgan("dev"));
   app.use("/report", ipfsRouter);
 
@@ -69,35 +68,7 @@ async function main() {
     res.status(200).send("health");
   });
 
-  // app.post('/submit', async (req, res) => {
-  //   try {
-  //     const { content, tags = [] } = req.body;
-  //     if (!content) throw new Error('請提供 content 欄位');
 
-  //     console.log('📝 處理檢舉內容:', content.substring(0, 50) + '...');
-  //     console.log('🏷️ 檢舉標籤:', tags);
-
-  //     // 生成模擬 IPFS CID (適用於 Demo)
-  //     const cidString = generateMockCID(content + JSON.stringify(tags));
-  //     console.log('📎 生成 CID:', cidString);
-
-  //     // 將檢舉內容和標籤存儲在內存中，以CID為鍵
-  //     reportContents.set(cidString, {
-  //       content: content,
-  //       tags: Array.isArray(tags) ? tags : [],
-  //       timestamp: Math.floor(Date.now() / 1000),
-  //       createdAt: new Date().toISOString()
-  //     });
-
-  //     console.log('💾 檢舉內容和標籤已存儲，CID:', cidString);
-
-  //     // 只返回 CID，讓前端直接調用智能合約
-  //     res.json({ success: true, cid: cidString });
-  //   } catch (e) {
-  //     console.error('處理請求錯誤:', e);
-  //     res.status(500).json({ success: false, error: e.message });
-  //   }
-  // });
 
   // // 新增獲取報告列表的 API
   // app.get('/reports', async (req, res) => {
