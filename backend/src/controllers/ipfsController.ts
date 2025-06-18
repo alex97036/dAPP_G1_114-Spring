@@ -43,9 +43,7 @@ export async function uploadFile(id: number): Promise<any> {
   const files = await filesFromPaths([filePath]); 
 
   const cid = await client.uploadDirectory(files)
-
-  console.log('📁 Uploaded CID:', cid.toString())
-  console.log(`🔗 IPFS URL: https://${cid}.ipfs.w3s.link`)
+  console.log(`IPFS URL: https://${cid}.ipfs.w3s.link`)
   return cid; 
 }
 
@@ -66,7 +64,6 @@ export async function saveToDB(cid: string) {
 export async function getAllCIDs() {
     try {
         const result = await pool.query<Report>('SELECT * FROM report_list')
-        console.log('Fetched CIDs from database:', result.rows); 
         return result.rows.map((row: Report) => row.cid)
     } catch (error) {
         console.error('Error fetching CIDs from database:', error)

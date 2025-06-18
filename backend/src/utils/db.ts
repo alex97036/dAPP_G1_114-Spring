@@ -24,7 +24,6 @@ export async function initDB() {
         cid TEXT PRIMARY KEY
       );
     `);
-    console.log('✅ Table "report_list" is ready');
   } catch (err) {
     console.error("❌ Error initializing DB:", err);
     process.exit(1);

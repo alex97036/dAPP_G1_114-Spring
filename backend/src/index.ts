@@ -31,16 +31,7 @@ async function main() {
     process.exit(1);
   }
 
-  // 簡化的 IPFS 處理 - 直接生成模擬 CID 用於 demo
-  const generateMockCID = (content: string) => {
-    const hash = crypto.createHash("sha256").update(content).digest("hex");
-    return `Qm${hash.substring(0, 44)}`; // 模擬 IPFS CID 格式
-  };
-
-  // 內存存儲檢舉內容 (生產環境建議使用數據庫)
-  const reportContents = new Map();
-
-  console.log("⚠️ 使用模擬 IPFS 模式 (適用於 Demo)");
+  // // 內存存儲檢舉內容 (生產環境建議使用數據庫)
 
   // v6 的写法：直接用 JsonRpcProvider、Wallet、Contract
   // const provider = new JsonRpcProvider(NETWORK_URL);
@@ -58,7 +49,7 @@ async function main() {
   app.use(cors());
   app.use(express.json())
   app.use(morgan("dev"));
-  app.use("/report", ipfsRouter);
+  app.use("/", ipfsRouter);
 
   app.get("/", (req, res) => {
     res.status(200).send("Welcome to the Report API");
@@ -67,8 +58,6 @@ async function main() {
   app.get("/health", (req, res) => {
     res.status(200).send("health");
   });
-
-
 
   // // 新增獲取報告列表的 API
   // app.get('/reports', async (req, res) => {
