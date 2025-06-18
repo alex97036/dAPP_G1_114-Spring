@@ -10,10 +10,10 @@ import { Report } from '../types/report.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const docsPath = path.resolve(__dirname, '../../docs')
+const reportPath = path.resolve(__dirname, '../../reports')
 
-if (!fs.existsSync(docsPath)) {
-  fs.mkdirSync(docsPath, { recursive: true })
+if (!fs.existsSync(reportPath)) {
+  fs.mkdirSync(reportPath, { recursive: true })
 }
 
 dotenv.config()
@@ -27,7 +27,7 @@ if (!EMAIL || !W3SPACE_DID) {
 
 export async function saveToDocs(id: number, info: string) {
     try {
-        const filePath = path.join(docsPath, `${id}.txt`); 
+        const filePath = path.join(reportPath, `${id}.txt`); 
         fs.writeFileSync(filePath, info, 'utf8');
         console.log(`Report saved to ${filePath}`)
     } catch (error) {
@@ -39,7 +39,7 @@ export async function uploadFile(id: number): Promise<any> {
   const client = await create()
   await client.login(EMAIL as `${string}@${string}`)
   await client.setCurrentSpace(W3SPACE_DID as `did:${string}:${string}`)
-  const filePath = path.join(docsPath, `${id}.txt`);
+  const filePath = path.join(reportPath, `${id}.txt`);
   const files = await filesFromPaths([filePath]); 
 
   const cid = await client.uploadDirectory(files)
