@@ -11,9 +11,8 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import ipfsRouter from "./routers/ipfsRouter.js";
-
-import { create } from "@web3-storage/w3up-client";
-import { filesFromPaths } from "files-from-path";
+import { initDB, pool } from "./utils/db.js";
+import morgan from "morgan";
 
 async function main() {
   const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -48,16 +47,26 @@ async function main() {
   // const wallet   = new Wallet(PRIVATE_KEY, provider);
   // const contract = new Contract(CONTRACT_ADDRESS, ABI, wallet);
 
+  initDB().catch((err) => {
+    console.error("❌ 初始化資料庫失敗:", err);
+    process.exit(1);
+  });
+  const data = await pool.query(`SELECT * FROM report_list;`);
+  console.log('📋 Current data in "report_list":', data.rows);
+
   const app = express();
   app.use(cors());
   app.use(bodyParser.json());
-
-
+  app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(morgan("dev"));
   app.use("/report", ipfsRouter);
 
+  app.get("/", (req, res) => {
+    res.status(200).send("Welcome to the Report API");
+  });
+
   app.get("/health", (req, res) => {
-    console.log("health");
-    res.send("health");
+    res.status(200).send("health");
   });
 
   // app.post('/submit', async (req, res) => {
