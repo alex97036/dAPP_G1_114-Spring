@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon",
-    "build": "tsc", 
+    "build": "tsc",
     "clean": "rimraf dist"
   },
   "keywords": [],
@@ -17,6 +17,7 @@
     "@web3-storage/w3up-client": "^17.3.0",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
+    "dayjs": "^1.11.13",
     "dotenv": "^16.5.0",
     "ethers": "^6.14.3",
     "express": "^5.1.0",
