@@ -61,14 +61,13 @@ export async function saveToDB(cid: string) {
     }
 }
 
-export async function getAllCIDs() {
-    try {
-        const result = await pool.query<Report>('SELECT * FROM report_list')
-        return result.rows.map((row: Report) => row.cid)
-    } catch (error) {
-        console.error('Error fetching CIDs from database:', error)
-        throw error
-    }
+export async function getAllCIDs(): Promise<string[]> {
+  try {
+    const result = await pool.query('SELECT * FROM report_list')
+    return result.rows.map((row: any) => (row.cid as string))
+  } catch (error) {
+    console.error('Error fetching CIDs from database:', error)
+    throw error
+  }
 }
-
 

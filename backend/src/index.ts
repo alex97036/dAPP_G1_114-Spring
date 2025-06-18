@@ -5,13 +5,12 @@ console.log("DEBUG ⛔ NETWORK_URL =", process.env.NETWORK_URL);
 
 import express from "express";
 import cors from "cors";
-import bodyParser from "body-parser";
 import { JsonRpcProvider, Wallet, Contract } from "ethers";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import ipfsRouter from "./routers/ipfsRouter.js";
-import { initDB, pool } from "./utils/db.js";
+import { initDB } from "./utils/db.js";
 import morgan from "morgan";
 
 async function main() {
@@ -42,17 +41,15 @@ async function main() {
     console.error("❌ 初始化資料庫失敗:", err);
     process.exit(1);
   });
-  const data = await pool.query(`SELECT * FROM report_list;`);
-  console.log('📋 Current data in "report_list":', data.rows);
 
   const app = express();
   app.use(cors());
-  app.use(express.json())
+  app.use(express.json());
   app.use(morgan("dev"));
   app.use("/", ipfsRouter);
 
   app.get("/", (req, res) => {
-    res.status(200).send("Welcome to the Report API");
+    res.status(200).send("Welcome to the Report");
   });
 
   app.get("/health", (req, res) => {
@@ -205,7 +202,7 @@ async function main() {
   // });
 
   app.listen(PORT, () => {
-    console.log(`🚀 Backend running on http://localhost:${PORT}`);
+    console.log(`Backend running on http://localhost:${PORT}`);
   });
 }
 
