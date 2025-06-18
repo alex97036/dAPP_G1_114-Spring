@@ -1,1 +1,7 @@
 node_modules/
+test-zkp.cjs
+test-zkp.js
+zkp-server.js
+zkp-server.cjs
+zkp-auth.js
+zkp-auth-ui.js

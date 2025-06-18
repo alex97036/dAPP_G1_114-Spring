@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "zkp": "node zkp-server.cjs",
+    "zkp-dev": "node --watch zkp-server.cjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

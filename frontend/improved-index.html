@@ -332,8 +332,20 @@
 
     <!-- 連接錢包按鈕 -->
     <div id="walletControls">
-      <button id="connectBtn">🔗 連接 MetaMask 錢包</button>
+      <button id="connectBtn">🔐 開始 ZKP 認證</button>
       <button id="disconnectBtn" style="display: none;">🔌 斷開錢包連接</button>
+      <button id="settingsBtn" style="margin-left: 10px;">⚙️ 設置</button>
+    </div>
+
+    <!-- 設置面板 -->
+    <div id="settingsPanel" style="display: none; margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
+      <h3>⚙️ 合約設置</h3>
+      <div style="margin-bottom: 10px;">
+        <label for="contractAddressInput" style="display: block; margin-bottom: 5px;">智能合約地址:</label>
+        <input type="text" id="contractAddressInput" placeholder="0x..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;">
+      </div>
+      <button id="updateContractBtn" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">📝 更新合約地址</button>
+      <button id="cancelSettingsBtn" style="background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">❌ 取消</button>
     </div>
 
     <!-- 檢舉表單 -->
@@ -409,6 +421,14 @@
 
   <!-- ethers.js UMD bundle -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  
+  <!-- ZKP 認證模組 -->
+  <script src="zkp-auth.js"></script>
+  <script src="zkp-auth-ui.js"></script>
+  
+  <!-- 智能合約 ABI -->
+  <script src="contract-abi.js"></script>
+  
   <script>
     let selectedTags = [];
     let currentFilter = 'all';
@@ -462,47 +482,11 @@
       return alert('請先確認已載入 ethers.js');
     }
 
-    // 合約地址和 ABI
-    const contractAddress = "0x18b72bfa680eec68e0fce91b810de8140c54b916";
-    const contractABI = [
-      {
-        "anonymous": false,
-        "inputs": [
-          {"indexed": true,"internalType":"address","name":"reporter","type":"address"},
-          {"indexed": false,"internalType":"string","name":"cid","type":"string"},
-          {"indexed": false,"internalType":"uint256","name":"timestamp","type":"uint256"}
-        ],
-        "name":"ReportSubmitted","type":"event"
-      },
-      {
-        "inputs":[{"internalType":"string","name":"cid","type":"string"}],
-        "name":"submitReport","outputs":[],"stateMutability":"nonpayable","type":"function"
-      },
-      {
-        "inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],
-        "name":"getReport","outputs":[
-          {"internalType":"address","name":"reporter","type":"address"},
-          {"internalType":"string","name":"cid","type":"string"},
-          {"internalType":"uint256","name":"timestamp","type":"uint256"}
-        ],
-        "stateMutability":"view","type":"function"
-      },
-      {
-        "inputs":[],
-        "name":"getReportCount",
-        "outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-        "stateMutability":"view","type":"function"
-      },
-      {
-        "inputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-        "name":"reports","outputs":[
-          {"internalType":"address","name":"reporter","type":"address"},
-          {"internalType":"string","name":"cid","type":"string"},
-          {"internalType":"uint256","name":"timestamp","type":"uint256"}
-        ],
-        "stateMutability":"view","type":"function"
-      }
-    ];
+    // 合約地址 (可在頁面設置中修改，預設使用環境變數中的地址)
+    let contractAddress = DEFAULT_CONTRACT_ADDRESS;
+    
+    // 使用外部 ABI 檔案中的定義
+    const contractABI = CONTRACT_ABI;
 
     let contract;
     let currentReports = [];
@@ -512,6 +496,11 @@
     // DOM 元素
     const connectBtn = document.getElementById('connectBtn');
     const disconnectBtn = document.getElementById('disconnectBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const contractAddressInput = document.getElementById('contractAddressInput');
+    const updateContractBtn = document.getElementById('updateContractBtn');
+    const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
     const reportForm = document.getElementById('reportForm');
     const historyDiv = document.getElementById('history');
     const reportsContainer = document.getElementById('reportsContainer');
@@ -523,61 +512,123 @@
     const selectedTagsEl = document.getElementById('selectedTags');
     const filterButtonsEl = document.getElementById('filterButtons');
 
-    // 連接 MetaMask
-    connectBtn.addEventListener('click', async() => {
-      try {
-        if (!window.ethereum) throw new Error('請先安裝 MetaMask');
-        
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        
-        // 請求帳號權限
-        const accounts = await provider.send('eth_requestAccounts', []);
-        currentAccount = accounts[0];
-        console.log('連接的帳號:', currentAccount);
-        
+    // 初始化合約地址輸入框
+    contractAddressInput.value = contractAddress;
+    
+    // 設置面板相關功能
+    settingsBtn.addEventListener('click', () => {
+      settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+      contractAddressInput.value = contractAddress; // 顯示當前地址
+    });
+    
+    cancelSettingsBtn.addEventListener('click', () => {
+      settingsPanel.style.display = 'none';
+      contractAddressInput.value = contractAddress; // 重置為當前地址
+    });
+    
+    updateContractBtn.addEventListener('click', () => {
+      const newAddress = contractAddressInput.value.trim();
+      if (!newAddress) {
+        alert('請輸入有效的合約地址');
+        return;
+      }
+      if (!ethers.utils.isAddress(newAddress)) {
+        alert('請輸入有效的以太坊地址格式');
+        return;
+      }
+      
+      contractAddress = newAddress;
+      alert(`合約地址已更新為: ${newAddress}`);
+      settingsPanel.style.display = 'none';
+      
+      // 如果已連接錢包，重新初始化合約
+      if (currentAccount && window.ethereum) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         contract = new ethers.Contract(contractAddress, contractABI, signer);
-
-        // 檢查網路
-        const network = await provider.getNetwork();
-        if (network.chainId !== 11155111) {
-          alert('請切換到 Sepolia 測試網路');
-          return;
-        }
-
-        // 監聽帳號變更
-        window.ethereum.on('accountsChanged', handleAccountsChanged);
-        window.ethereum.on('chainChanged', handleChainChanged);
-
-        // 更新 UI 顯示當前帳號
-        updateAccountDisplay();
-
-        // 顯示介面
-        connectBtn.style.display = 'none';
-        disconnectBtn.style.display = 'inline-block';
-        reportForm.style.display = 'block';
-        historyDiv.style.display = 'block';
-
-        // 載入歷史記錄
-        await loadHistory();
-        subscribeEvents();
-        
-      } catch(e) {
-        console.error('連接錯誤:', e);
-        showError('連接錯誤: ' + e.message);
       }
     });
 
-    // 斷開錢包連接
+    // ZKP 認證 + 連接 MetaMask（修改原本的連接邏輯）
+    connectBtn.addEventListener('click', async() => {
+      try {
+        // 1. 先檢查是否已完成 ZKP 認證
+        if (!window.zkpAuth || !window.zkpAuth.isAuthenticated) {
+          // 顯示 ZKP 認證模態框
+          window.zkpAuthUI.showAuthModal();
+          return;
+        }
+
+        // 2. ZKP 認證完成後，執行原本的 MetaMask 連接邏輯
+        await window.connectMetaMask();
+        
+      } catch(e) {
+        console.error('認證或連接錯誤:', e);
+        showError('認證或連接錯誤: ' + e.message);
+      }
+    });
+
+    // 原本的 MetaMask 連接邏輯（拆分出來並設為全域函數）
+    window.connectMetaMask = async function() {
+      if (!window.ethereum) throw new Error('請先安裝 MetaMask');
+      
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      
+      // 請求帳號權限
+      const accounts = await provider.send('eth_requestAccounts', []);
+      currentAccount = accounts[0];
+      console.log('連接的帳號:', currentAccount);
+      
+      const signer = provider.getSigner();
+      contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+      // 檢查網路
+      const network = await provider.getNetwork();
+      if (network.chainId !== 11155111) {
+        alert('請切換到 Sepolia 測試網路');
+        return;
+      }
+
+      // 移除之前的事件監聽器（避免重複綁定）
+      if (window.ethereum) {
+        window.ethereum.removeAllListeners('accountsChanged');
+        window.ethereum.removeAllListeners('chainChanged');
+      }
+
+      // 監聽帳號變更
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
+
+      // 更新 UI 顯示當前帳號
+      updateAccountDisplay();
+
+      // 顯示介面
+      connectBtn.style.display = 'none';
+      disconnectBtn.style.display = 'inline-block';
+      reportForm.style.display = 'block';
+      historyDiv.style.display = 'block';
+
+      // 載入歷史記錄
+      await loadHistory();
+      subscribeEvents();
+    }
+
+    // 斷開錢包連接（同時清除 ZKP 認證）
     disconnectBtn.addEventListener('click', async() => {
       try {
         // 顯示確認對話框
-        const confirmed = confirm('確定要斷開 MetaMask 錢包連接嗎？\n\n斷開連接後將無法提交檢舉或查看個人記錄。');
+        const confirmed = confirm('確定要斷開錢包連接嗎？\n\n斷開連接後將清除 ZKP 認證，需要重新進行身分驗證。');
         if (!confirmed) return;
 
         console.log('用戶主動斷開錢包連接');
         
-        // 清理狀態
+        // 清理 ZKP 認證狀態
+        if (window.zkpAuth) {
+          window.zkpAuth.logout();
+          console.log('✅ ZKP 認證已清除');
+        }
+        
+        // 清理錢包狀態
         currentAccount = null;
         provider = null;
         contract = null;
@@ -594,6 +645,7 @@
         if (accountInfo) accountInfo.remove();
         
         // 重置 UI
+        connectBtn.textContent = '🔐 開始 ZKP 認證';
         connectBtn.style.display = 'inline-block';
         disconnectBtn.style.display = 'none';
         reportForm.style.display = 'none';
@@ -627,17 +679,7 @@
       if (accounts.length === 0) {
         // 用戶在 MetaMask 中斷開連接
         console.log('用戶在 MetaMask 中斷開連接');
-        
-        // 顯示通知訊息
-        const infoMsg = document.createElement('div');
-        infoMsg.className = 'error';
-        infoMsg.innerHTML = '⚠️ 檢測到錢包已在 MetaMask 中斷開連接，頁面將重新載入';
-        document.body.insertBefore(infoMsg, document.body.firstChild);
-        
-        setTimeout(() => {
-          location.reload();
-        }, 2000);
-        
+        location.reload();
       } else {
         // 用戶切換帳號
         const newAccount = accounts[0];
@@ -773,6 +815,33 @@
           ? report.tags.map(tag => `<span class="selected-tag">${tag}</span>`).join('')
           : '<span style="color: #6c757d; font-style: italic;">無標籤</span>';
         
+        // 處理 ZKP 匿名檢舉人資訊顯示
+        const zkpInfo = report.reporterCommitment 
+          ? `
+            <div class="detail-label">🔐 ZKP 認證狀態:</div>
+            <div class="detail-value">
+              <span style="color: #28a745; font-weight: bold;">✅ 已通過 ZKP 驗證</span>
+            </div>
+            <div class="detail-label">🆔 匿名身分:</div>
+            <div class="detail-value">
+              <code style="font-size: 0.8rem; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">
+                ${report.reporterCommitment.substring(0, 16)}...
+              </code>
+            </div>
+            <div class="detail-label">🎯 檢舉識別碼:</div>
+            <div class="detail-value">
+              <code style="font-size: 0.8rem; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">
+                ${report.nullifierHash ? report.nullifierHash.substring(0, 16) + '...' : '無'}
+              </code>
+            </div>
+          `
+          : `
+            <div class="detail-label">🔐 ZKP 認證狀態:</div>
+            <div class="detail-value">
+              <span style="color: #6c757d;">⚪ 舊記錄（未使用 ZKP）</span>
+            </div>
+          `;
+        
         return `
           <div class="report-item">
             <div class="report-header">
@@ -782,6 +851,7 @@
             <div class="report-details">
               <div class="detail-label">檢舉人:</div>
               <div class="detail-value">${shortReporter}</div>
+              ${zkpInfo}
               <div class="detail-label">詐騙類型標籤:</div>
               <div class="detail-value">${tagsHtml}</div>
               <div class="detail-label">檢舉內容:</div>
@@ -860,7 +930,7 @@
     // 重新載入按鈕
     refreshBtn.addEventListener('click', loadHistory);
 
-    // 提交檢舉
+    // 提交檢舉（加入 ZKP Proof 驗證）
     reportForm.addEventListener('submit', async(e) => {
       e.preventDefault();
       const content = textarea.value.trim();
@@ -876,30 +946,47 @@
       
       try {
         submitBtn.disabled = true;
-        submitBtn.textContent = '⏳ 提交中...';
+        submitBtn.textContent = '⏳ 生成 ZK Proof...';
         
-        // 確保使用當前帳號
-        const accounts = await provider.send('eth_requestAccounts', []);
-        const activeAccount = accounts[0];
+        // 1. 檢查 ZKP 認證狀態
+        if (!window.zkpAuth || !window.zkpAuth.isAuthenticated) {
+          throw new Error('請先完成 ZKP 認證');
+        }
+
+        // 2. 生成 ZK Proof
+        const reportData = {
+          content: content,
+          tags: selectedTags,
+          timestamp: Date.now()
+        };
         
-        if (activeAccount !== currentAccount) {
-          console.log('檢測到帳號變更，更新當前帳號');
-          currentAccount = activeAccount;
-          const signer = provider.getSigner();
-          contract = new ethers.Contract(contractAddress, contractABI, signer);
-          updateAccountDisplay();
+        const proof = await window.zkpAuth.generateProof('submit_report', reportData);
+        console.log('✅ ZK Proof 生成成功');
+        
+        submitBtn.textContent = '⏳ 驗證 Proof...';
+        
+        // 3. 驗證 Proof
+        const isValidProof = await window.zkpAuth.verifyProof(proof);
+        if (!isValidProof) {
+          throw new Error('ZK Proof 驗證失敗');
         }
         
+        console.log('✅ ZK Proof 驗證成功');
+        submitBtn.textContent = '⏳ 提交中...';
+        
+        // 使用已連接的當前帳號
         console.log('提交檢舉的帳號:', currentAccount);
         console.log('選擇的標籤:', selectedTags);
+        console.log('ZK Proof Nullifier:', proof.nullifierHash);
         
-        // 步驟1: 從後端獲取 CID（包含標籤）
+        // 步驟1: 從後端獲取 CID（包含標籤和 ZK Proof）
         const response = await fetch('http://localhost:3000/submit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             content: content,
-            tags: selectedTags 
+            tags: selectedTags,
+            zkProof: proof // 包含 ZK Proof
           })
         });
         
@@ -908,9 +995,17 @@
         
         submitBtn.textContent = '⏳ 提交到區塊鏈...';
         
-        // 步驟2: 直接調用智能合約（使用當前用戶的帳號）
+        // 步驟2: 調用新的智能合約方法（包含 ZKP 資訊）
         console.log('🔗 調用智能合約，CID:', data.cid);
-        const tx = await contract.submitReport(data.cid);
+        console.log('🔐 ZKP Proof:', proof);
+        
+        // 使用新的 submitReportWithZKP 方法
+        const tx = await contract.submitReportWithZKP(
+          data.cid,
+          proof.commitment || "",
+          proof.nullifierHash || "",
+          true // zkpVerified = true
+        );
         console.log('📝 交易已送出:', tx.hash);
         
         submitBtn.textContent = '⏳ 等待確認...';
@@ -922,6 +1017,7 @@
         successMsg.className = 'success';
         successMsg.innerHTML = `
           ✅ 檢舉提交成功！<br>
+          <strong>🔐 ZKP 狀態:</strong> 已驗證 (${proof.nullifierHash.substring(0, 8)}...)<br>
           <strong>提交帳號:</strong> ${currentAccount}<br>
           <strong>選擇標籤:</strong> ${selectedTags.join(', ') || '無'}<br>
           <strong>CID:</strong> ${data.cid}<br>

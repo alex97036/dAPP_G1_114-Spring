@@ -42,15 +42,43 @@ build/
 # Logs
 logs
 *.log
-
-# Runtime data
-pids
+backend/*.log
 *.pid
 *.seed
 *.pid.lock
+
+# Runtime data
+pids
 
 # Coverage directory used by tools like istanbul
 coverage/
 
 # nyc test coverage
 .nyc_output
+
+# Test files and debugging files
+**/test-*.js
+**/test-*.cjs
+**/debug-*.html
+backend/original-*.js
+
+# 不要忽略核心 ZKP 服務檔案
+!backend/zkp-server.js
+!backend/zkp-server.cjs
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# Lock files (optional - 有些專案會保留 package-lock.json)
+# package-lock.json
+
+# Development and testing utilities
+fix-*.sh
+test-*.sh
+
+# Browser cache and temporary files
+.cache/
+temp/
+tmp/

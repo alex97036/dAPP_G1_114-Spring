@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZKP 認證管理系統</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px; 
+      max-width: 1000px; 
+      margin: auto; 
+      background-color: #f5f5f5;
+    }
+    
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    h1, h2 { color: #333; margin-bottom: 20px; }
+    h1 { border-bottom: 3px solid #dc3545; padding-bottom: 10px; }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .stat-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    
+    button {
+      font-size: 1rem;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      color: white;
+    }
+    
+    .btn-danger {
+      background: linear-gradient(135deg, #dc3545, #c82333);
+      color: white;
+    }
+    
+    .btn-success {
+      background: linear-gradient(135deg, #28a745, #20c997);
+      color: white;
+    }
+    
+    button:hover:not(:disabled) { transform: translateY(-2px); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #555;
+    }
+    
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+    
+    input:focus, textarea:focus {
+      border-color: #007bff;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+    }
+    
+    .log-container {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 15px;
+      background: #f8f9fa;
+    }
+    
+    .log-entry {
+      margin-bottom: 10px;
+      padding: 10px;
+      background: white;
+      border-radius: 5px;
+      border-left: 4px solid #007bff;
+    }
+    
+    .log-entry.revoked {
+      border-left-color: #dc3545;
+    }
+    
+    .log-timestamp {
+      color: #6c757d;
+      font-size: 0.8rem;
+    }
+    
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #f5c6cb;
+      margin-bottom: 15px;
+    }
+    
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #c3e6cb;
+      margin-bottom: 15px;
+    }
+    
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #ffeaa7;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🛡️ ZKP 認證管理系統</h1>
+    
+    <div class="warning">
+      <strong>⚠️ 管理員專用：</strong> 此工具用於管理 Zero Knowledge Proof 認證系統，包括查看統計資料和撤銷惡意用戶的認證。
+    </div>
+
+    <!-- 統計資料 -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-number" id="totalIdentities">-</div>
+        <div class="stat-label">總註冊身分</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="activeIdentities">-</div>
+        <div class="stat-label">活躍身分</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="revokedIdentities">-</div>
+        <div class="stat-label">已撤銷身分</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="totalProofs">-</div>
+        <div class="stat-label">總 Proof 數量</div>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 30px;">
+      <button class="btn-primary" onclick="loadStats()">🔄 重新載入統計</button>
+      <button class="btn-success" onclick="checkHealth()">💚 檢查服務狀態</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>🚫 撤銷用戶認證</h2>
+    
+    <div class="warning">
+      <strong>注意：</strong> 撤銷認證後，該用戶將無法再使用系統，此操作不可逆。
+    </div>
+
+    <form id="revokeForm">
+      <div class="form-group">
+        <label for="commitment">Commitment（用戶身分識別碼）:</label>
+        <input type="text" id="commitment" placeholder="請輸入要撤銷的 commitment" required>
+        <small style="color: #6c757d; font-size: 0.8rem;">
+          * 可從系統日誌或惡意行為報告中取得此識別碼
+        </small>
+      </div>
+      
+      <div class="form-group">
+        <label for="reason">撤銷原因:</label>
+        <textarea id="reason" rows="3" placeholder="請說明撤銷原因（例如：惡意檢舉、濫用系統等）" required></textarea>
+      </div>
+      
+      <button type="submit" class="btn-danger">🚫 撤銷認證</button>
+    </form>
+  </div>
+
+  <div class="container">
+    <h2>📋 操作日誌</h2>
+    <div class="log-container" id="logContainer">
+      <div style="text-align: center; color: #6c757d;">
+        載入中...
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>📋 檢舉人記錄查詢</h2>
+    
+    <div class="warning">
+      <strong>說明：</strong> 此功能用於查詢檢舉人的匿名身分記錄，即使不知道檢舉人真實身分，也能根據 commitment 進行管理。
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <button class="btn-primary" onclick="loadReporterRecords()">📊 載入所有檢舉人記錄</button>
+      <button class="btn-success" onclick="exportRecords()">💾 匯出記錄</button>
+    </div>
+    
+    <div class="form-group">
+      <label for="searchCommitment">🔍 搜尋特定檢舉人 (Commitment):</label>
+      <input type="text" id="searchCommitment" placeholder="請輸入 commitment 搜尋特定檢舉人的所有記錄">
+      <button class="btn-primary" onclick="searchReporter()" style="margin-top: 10px;">🔍 搜尋</button>
+    </div>
+    
+    <div id="reporterRecords" class="log-container">
+      <div style="text-align: center; color: #6c757d;">
+        點擊「載入所有檢舉人記錄」查看記錄
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3001/api/zkp';
+    let operationLog = [];
+
+    // 頁面載入時初始化
+    document.addEventListener('DOMContentLoaded', function() {
+      loadStats();
+      checkHealth();
+      
+      // 綁定撤銷表單事件
+      document.getElementById('revokeForm').addEventListener('submit', handleRevoke);
+    });
+
+    /**
+     * 載入統計資料
+     */
+    async function loadStats() {
+      try {
+        const response = await fetch(`${API_BASE}/stats`);
+        const stats = await response.json();
+        
+        if (response.ok) {
+          document.getElementById('totalIdentities').textContent = stats.totalIdentities;
+          document.getElementById('activeIdentities').textContent = stats.activeIdentities;
+          document.getElementById('revokedIdentities').textContent = stats.revokedIdentities;
+          document.getElementById('totalProofs').textContent = stats.totalProofs;
+          
+          addLog('success', '統計資料載入成功');
+        } else {
+          throw new Error(stats.error || '載入統計失敗');
+        }
+      } catch (error) {
+        console.error('載入統計錯誤:', error);
+        addLog('error', '載入統計失敗: ' + error.message);
+      }
+    }
+
+    /**
+     * 檢查服務健康狀態
+     */
+    async function checkHealth() {
+      try {
+        const response = await fetch(`${API_BASE}/health`);
+        const health = await response.json();
+        
+        if (response.ok) {
+          addLog('success', `ZKP 服務運行正常 - ${health.service}`);
+        } else {
+          throw new Error('服務異常');
+        }
+      } catch (error) {
+        console.error('健康檢查錯誤:', error);
+        addLog('error', 'ZKP 服務連接失敗: ' + error.message);
+      }
+    }
+
+    /**
+     * 處理撤銷認證
+     */
+    async function handleRevoke(e) {
+      e.preventDefault();
+      
+      const commitment = document.getElementById('commitment').value.trim();
+      const reason = document.getElementById('reason').value.trim();
+      
+      if (!commitment || !reason) {
+        addLog('error', '請填寫完整的撤銷資訊');
+        return;
+      }
+
+      // 確認撤銷
+      const confirmed = confirm(
+        `確定要撤銷以下認證嗎？\n\n` +
+        `Commitment: ${commitment.substring(0, 16)}...\n` +
+        `原因: ${reason}\n\n` +
+        `此操作不可逆！`
+      );
+      
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/revoke`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commitment, reason })
+        });
+
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          addLog('revoked', `✅ 認證撤銷成功: ${commitment.substring(0, 16)}... (${reason})`);
+          
+          // 清空表單
+          document.getElementById('commitment').value = '';
+          document.getElementById('reason').value = '';
+          
+          // 重新載入統計
+          setTimeout(loadStats, 1000);
+        } else {
+          throw new Error(result.error || '撤銷失敗');
+        }
+      } catch (error) {
+        console.error('撤銷錯誤:', error);
+        addLog('error', '撤銷失敗: ' + error.message);
+      }
+    }
+
+    /**
+     * 添加日誌條目
+     */
+    function addLog(type, message) {
+      const timestamp = new Date().toLocaleString('zh-TW');
+      const logEntry = {
+        type: type,
+        message: message,
+        timestamp: timestamp
+      };
+      
+      operationLog.unshift(logEntry);
+      
+      // 只保留最近50條記錄
+      if (operationLog.length > 50) {
+        operationLog = operationLog.slice(0, 50);
+      }
+      
+      updateLogDisplay();
+    }
+
+    /**
+     * 更新日誌顯示
+     */
+    function updateLogDisplay() {
+      const container = document.getElementById('logContainer');
+      
+      if (operationLog.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #6c757d;">暫無操作記錄</div>';
+        return;
+      }
+      
+      const logHTML = operationLog.map(log => `
+        <div class="log-entry ${log.type}">
+          <div>${log.message}</div>
+          <div class="log-timestamp">${log.timestamp}</div>
+        </div>
+      `).join('');
+      
+      container.innerHTML = logHTML;
+    }
+
+    /**
+     * 載入檢舉人記錄
+     */
+    async function loadReporterRecords() {
+      try {
+        const response = await fetch('http://localhost:3000/admin/reporter-records');
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          displayReporterRecords(result.records);
+          addLog('success', `載入了 ${result.total} 筆檢舉人記錄`);
+        } else {
+          throw new Error(result.error || '載入檢舉人記錄失敗');
+        }
+      } catch (error) {
+        console.error('載入檢舉人記錄錯誤:', error);
+        addLog('error', '載入檢舉人記錄失敗: ' + error.message);
+      }
+    }
+
+    /**
+     * 搜尋特定檢舉人
+     */
+    async function searchReporter() {
+      const commitment = document.getElementById('searchCommitment').value.trim();
+      
+      if (!commitment) {
+        addLog('error', '請輸入 commitment');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`http://localhost:3000/admin/reporter/${commitment}`);
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          displayReporterRecords(result.records, result.commitment);
+          addLog('success', `找到檢舉人 ${commitment.substring(0, 16)}... 的 ${result.total} 筆記錄`);
+        } else {
+          throw new Error(result.error || '搜尋失敗');
+        }
+      } catch (error) {
+        console.error('搜尋檢舉人錯誤:', error);
+        addLog('error', '搜尋失敗: ' + error.message);
+      }
+    }
+
+    /**
+     * 顯示檢舉人記錄
+     */
+    function displayReporterRecords(records, searchCommitment = null) {
+      const container = document.getElementById('reporterRecords');
+      
+      if (!records || records.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; color: #6c757d;">
+            ${searchCommitment ? '未找到該檢舉人的記錄' : '暫無檢舉人記錄'}
+          </div>
+        `;
+        return;
+      }
+      
+      const title = searchCommitment 
+        ? `檢舉人 ${searchCommitment.substring(0, 16)}... 的記錄 (${records.length} 筆)`
+        : `所有檢舉人記錄 (${records.length} 筆)`;
+      
+      const recordsHTML = records.map(record => {
+        const date = new Date(record.createdAt).toLocaleString('zh-TW');
+        const tags = record.tags && record.tags.length > 0 
+          ? record.tags.join(', ') 
+          : '無標籤';
+        
+        return `
+          <div class="log-entry" style="border-left-color: #007bff;">
+            <div><strong>📝 CID:</strong> ${record.cid}</div>
+            <div><strong>🆔 匿名身分:</strong> <code>${record.reporterCommitment.substring(0, 16)}...</code></div>
+            <div><strong>🎯 檢舉識別碼:</strong> <code>${record.nullifierHash ? record.nullifierHash.substring(0, 16) + '...' : '無'}</code></div>
+            <div><strong>🔐 ZKP 狀態:</strong> ${record.zkpVerified ? '✅ 已驗證' : '❌ 未驗證'}</div>
+            <div><strong>🏷️ 標籤:</strong> ${tags}</div>
+            <div><strong>📄 內容預覽:</strong> ${record.contentPreview}</div>
+            <div class="log-timestamp">${date}</div>
+            <div style="margin-top: 10px;">
+              <button class="btn-danger" onclick="revokeReporter('${record.reporterCommitment}')" style="font-size: 0.8rem; padding: 6px 12px;">
+                🚫 撤銷此檢舉人
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      container.innerHTML = `
+        <div style="margin-bottom: 15px; font-weight: bold; color: #333;">
+          ${title}
+        </div>
+        ${recordsHTML}
+      `;
+    }
+
+    /**
+     * 撤銷檢舉人
+     */
+    async function revokeReporter(commitment) {
+      const reason = prompt(`確定要撤銷檢舉人的認證嗎？\n\nCommitment: ${commitment.substring(0, 16)}...\n\n請輸入撤銷原因:`);
+      
+      if (!reason) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/revoke`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commitment, reason })
+        });
+
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          addLog('revoked', `✅ 檢舉人認證撤銷成功: ${commitment.substring(0, 16)}... (${reason})`);
+          
+          // 重新載入統計和記錄
+          setTimeout(() => {
+            loadStats();
+            loadReporterRecords();
+          }, 1000);
+        } else {
+          throw new Error(result.error || '撤銷失敗');
+        }
+      } catch (error) {
+        console.error('撤銷檢舉人錯誤:', error);
+        addLog('error', '撤銷失敗: ' + error.message);
+      }
+    }
+
+    /**
+     * 匯出記錄
+     */
+    async function exportRecords() {
+      try {
+        const response = await fetch('http://localhost:3000/admin/reporter-records');
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          const csvContent = generateCSV(result.records);
+          downloadCSV(csvContent, `reporter-records-${new Date().toISOString().split('T')[0]}.csv`);
+          addLog('success', `匯出了 ${result.total} 筆記錄`);
+        } else {
+          throw new Error(result.error || '匯出失敗');
+        }
+      } catch (error) {
+        console.error('匯出錯誤:', error);
+        addLog('error', '匯出失敗: ' + error.message);
+      }
+    }
+
+    /**
+     * 生成 CSV
+     */
+    function generateCSV(records) {
+      const headers = ['CID', '匿名身分', '檢舉識別碼', 'ZKP驗證', '標籤', '內容預覽', '時間'];
+      const rows = records.map(record => [
+        record.cid,
+        record.reporterCommitment,
+        record.nullifierHash || '',
+        record.zkpVerified ? '是' : '否',
+        record.tags ? record.tags.join(';') : '',
+        record.contentPreview.replace(/"/g, '""'),
+        record.createdAt
+      ]);
+      
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(field => `"${field}"`).join(','))
+        .join('\n');
+      
+      return csvContent;
+    }
+
+    /**
+     * 下載 CSV
+     */
+    function downloadCSV(content, filename) {
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+    }
+
+    // 初始化日誌顯示
+    updateLogDisplay();
+  </script>
+</body>
+</html>

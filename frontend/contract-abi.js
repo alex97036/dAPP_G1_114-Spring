@@ -1,4 +1,5 @@
-[
+// 智能合約 ABI 定義
+const CONTRACT_ABI = [
 	{
 		"anonymous": false,
 		"inputs": [
@@ -416,4 +417,7 @@
 		"stateMutability": "view",
 		"type": "function"
 	}
-]
+];
+
+// 預設合約地址 (與後端 .env 中的地址一致)
+const DEFAULT_CONTRACT_ADDRESS = "0xf1b05d82e56c76a24ff3e0949b485e3a3c52274a";
