@@ -14,14 +14,14 @@ export const pool = new Pool({
   },
 });
 
-
-
 export async function initDB() {
   try {
     await pool.query("SELECT NOW()");
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS report_list (
-        cid TEXT PRIMARY KEY
+      CREATE TABLE report_list (
+        cid TEXT PRIMARY KEY,
+        file_name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT now()
       );
     `);
   } catch (err) {
@@ -29,4 +29,3 @@ export async function initDB() {
     process.exit(1);
   }
 }
-
